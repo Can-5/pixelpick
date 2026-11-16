@@ -144,6 +144,36 @@ impl Palette {
             .copied()
             .min_by_key(|c| squared_distance(*c, target))
     }
+
+    /// Number of colors in the palette.
+    pub fn len(&self) -> usize {
+        self.colors.len()
+    }
+
+    /// True when the palette holds no colors.
+    pub fn is_empty(&self) -> bool {
+        self.colors.is_empty()
+    }
+
+    /// The `n` nearest palette colors to `target` with their Euclidean distances,
+    /// sorted by distance (ties broken by channel values for determinism).
+    /// Returns every color when `n >= self.len()`. Empty palette or `n == 0` yields `[]`.
+    pub fn nearest_n(&self, target: Rgb, n: usize) -> Vec<(Rgb, f64)> {
+        let mut scored: Vec<(Rgb, f64)> = self
+            .colors
+            .iter()
+            .map(|c| (*c, (squared_distance(*c, target) as f64).sqrt()))
+            .collect();
+        scored.sort_by(|a, b| {
+            a.1.partial_cmp(&b.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.0.r.cmp(&b.0.r))
+                .then(a.0.g.cmp(&b.0.g))
+                .then(a.0.b.cmp(&b.0.b))
+        });
+        scored.truncate(n);
+        scored
+    }
 }
 
 pub fn squared_distance(a: Rgb, b: Rgb) -> u32 {
@@ -197,6 +227,39 @@ mod tests {
     fn hsl_rejects_out_of_range() {
         assert!(hsl_to_rgb(Hsl { h: 400.0, s: 50.0, l: 50.0 }).is_err());
         assert!(hsl_to_rgb(Hsl { h: f64::NAN, s: 50.0, l: 50.0 }).is_err());
+    }
+
+    #[test]
+    fn palette_len_and_is_empty() {
+        let empty = Palette::default();
+        assert_eq!(empty.len(), 0);
+        assert!(empty.is_empty());
+        let p = Palette::new("x", vec![Rgb::new(1, 2, 3)]);
+        assert_eq!(p.len(), 1);
+        assert!(!p.is_empty());
+    }
+
+    #[test]
+    fn nearest_n_returns_sorted_and_capped() {
+        let p = Palette::new("n", vec![
+            Rgb::new(0, 0, 0),
+            Rgb::new(255, 255, 255),
+            Rgb::new(200, 0, 0),
+            Rgb::new(100, 100, 100),
+        ]);
+        let got = p.nearest_n(Rgb::new(90, 90, 90), 2);
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0].0, Rgb::new(100, 100, 100)); // closest
+        assert!(got[0].1 <= got[1].1, "distances must be ascending");
+        // n larger than palette returns everything
+        assert_eq!(p.nearest_n(Rgb::new(0, 0, 0), 99).len(), 4);
+        // edge cases
+        assert_eq!(p.nearest_n(Rgb::new(0, 0, 0), 0).len(), 0);
+        assert!(Palette::default().nearest_n(Rgb::new(0, 0, 0), 3).is_empty());
+        // exact distance check: target == palette entry -> distance 0
+        let exact = p.nearest_n(Rgb::new(255, 255, 255), 1);
+        assert_eq!(exact[0].0, Rgb::new(255, 255, 255));
+        assert_eq!(exact[0].1, 0.0);
     }
 
     #[test]

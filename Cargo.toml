@@ -1,0 +1,13 @@
+[package]
+name = "pixelpick"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Color science for Orbit: sRGB hex/RGB/HSL conversion, palettes, nearest-color matching. No screen-sampling code lives here."
+repository = "https://github.com/Can-5/pixelpick"
+keywords = ["color", "hex", "orbit"]
+categories = ["graphics"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
